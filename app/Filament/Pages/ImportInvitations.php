@@ -60,7 +60,7 @@ class ImportInvitations extends Page
             $paName = trim($record['pa_name'] ?? '');
             $paEmail = trim($record['pa_email'] ?? '');
 
-            if (! $vipName || ! $paEmail) {
+            if (! $vipName ) {
                 $skipped++;
                 continue;
             }
@@ -75,6 +75,18 @@ class ImportInvitations extends Page
         'vip_phone' => trim($record['vip_phone'] ?? '') ?: null,
     ],
 );
+if ($paEmail) {
+    InvitationContact::firstOrCreate(
+        [
+            'invitation_id' => $invitation->id,
+            'email' => $paEmail,
+        ],
+        [
+            'name' => $paName ?: $paEmail,
+            'token' => \Illuminate\Support\Str::random(40),
+        ],
+    );
+}
 
 InvitationContact::firstOrCreate(
     [
