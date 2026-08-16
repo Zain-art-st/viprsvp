@@ -53,13 +53,12 @@ class ContactsRelationManager extends RelationManager
                     ->label('Send Invitation')
                     ->icon('heroicon-o-envelope')
                     ->action(function (\App\Models\InvitationContact $record) {
-                        \Illuminate\Support\Facades\Mail::to($record->email)
-                            ->send(new \App\Mail\InvitationEmail($record));
+                    \Illuminate\Support\Facades\Mail::send(new \App\Mail\InvitationEmail($record));
 
-                        \Filament\Notifications\Notification::make()
-                            ->title('Invitation sent to '.$record->email)
-                            ->success()
-                            ->send();
+                     \Filament\Notifications\Notification::make()
+                    ->title('Invitation sent for '.$record->invitation->vip_name)
+                    ->success()
+                    ->send();
                     }),
                 EditAction::make(),
                 DeleteAction::make(),

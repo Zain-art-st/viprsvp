@@ -16,6 +16,11 @@ class InvitationForm
                 TextInput::make('vip_name')
                     ->required(),
                 TextInput::make('organization'),
+                TextInput::make('vip_email')
+                    ->email()
+                    ->label('VIP Email'),
+                TextInput::make('vip_phone')
+                    ->label('VIP Phone'),
                 Select::make('attendance_status')
                     ->options([
                         'pending' => 'Pending',

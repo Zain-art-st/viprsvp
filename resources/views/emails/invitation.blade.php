@@ -1,10 +1,9 @@
 <x-mail::message>
 # Independence Day Attendance Confirmation
 
-Dear {{ $contactName }},
+DDear {{ $vipName }},
 
-You are receiving this on behalf of **{{ $vipName }}** for the upcoming Independence Day event.
-
+Please confirm your attendance for the upcoming Independence Day event using the secure link below. {{ $contactName }} has also been copied on this email and may submit this confirmation on your behalf.
 Please confirm attendance using the secure link below:
 
 <x-mail::button :url="$rsvpUrl">

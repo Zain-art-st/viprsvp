@@ -20,6 +20,9 @@ class InvitationsTable
                     ->sortable(),
                 TextColumn::make('organization')
                     ->searchable(),
+                    TextColumn::make('vip_email')
+                     ->label('VIP Email')
+                    ->searchable(),
                 TextColumn::make('attendance_status')
                     ->badge()
                     ->colors([

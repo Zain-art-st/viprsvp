@@ -19,9 +19,17 @@ class InvitationEmail extends Mailable
 
     public function envelope(): Envelope
 {
+    $invitation = $this->contact->invitation;
+
     return new Envelope(
-        subject: 'Independence Day Attendance Confirmation — '.$this->contact->invitation->vip_name,
-        replyTo: [config('mail.reply_to_address', 'afifnaufalzaidi@gmail.com')],
+        to: $invitation->vip_email
+            ? [$invitation->vip_email]
+            : [$this->contact->email],
+        cc: $invitation->vip_email
+            ? [$this->contact->email]
+            : [],
+        replyTo: [config('mail.reply_to_address', 'afiflegend2006@gmail.com@gmail.com')],
+        subject: 'Independence Day Attendance Confirmation — '.$invitation->vip_name,
     );
 }
 

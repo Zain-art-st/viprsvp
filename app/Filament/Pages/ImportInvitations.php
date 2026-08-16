@@ -72,16 +72,16 @@ class ImportInvitations extends Page
                 ],
             );
 
-            InvitationContact::firstOrCreate(
-            [
-            'invitation_id' => $invitation->id,
-                'email' => $paEmail,
-            ],
-            [
-            'name' => $paName ?: $paEmail,
-            'token' => \Illuminate\Support\Str::random(40),
-            ],
-        );
+           $invitation = Invitation::firstOrCreate(
+    [
+        'vip_name' => $vipName,
+        'organization' => trim($record['organization'] ?? '') ?: null,
+    ],
+    [
+        'vip_email' => trim($record['vip_email'] ?? '') ?: null,
+        'vip_phone' => trim($record['vip_phone'] ?? '') ?: null,
+    ],
+);
             $created++;
         }
 
