@@ -66,13 +66,6 @@ class ImportInvitations extends Page
             }
 
             $invitation = Invitation::firstOrCreate(
-                [
-                    'vip_name' => $vipName,
-                    'organization' => trim($record['organization'] ?? '') ?: null,
-                ],
-            );
-
-           $invitation = Invitation::firstOrCreate(
     [
         'vip_name' => $vipName,
         'organization' => trim($record['organization'] ?? '') ?: null,
@@ -82,7 +75,20 @@ class ImportInvitations extends Page
         'vip_phone' => trim($record['vip_phone'] ?? '') ?: null,
     ],
 );
-            $created++;
+
+InvitationContact::firstOrCreate(
+    [
+        'invitation_id' => $invitation->id,
+        'email' => $paEmail,
+    ],
+    [
+        'name' => $paName ?: $paEmail,
+        'token' => \Illuminate\Support\Str::random(40),
+    ],
+);
+
+$created++;
+            
         }
 
         Storage::disk('local')->delete($path);
