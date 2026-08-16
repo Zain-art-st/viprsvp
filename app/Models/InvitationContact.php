@@ -19,7 +19,14 @@ class InvitationContact extends Model
         'last_used_at' => 'datetime',
     ];
 
-
+    protected static function booted(): void
+    {
+        static::creating(function (InvitationContact $contact) {
+            if (empty($contact->token)) {
+                $contact->token = \Illuminate\Support\Str::random(40);
+            }
+        });
+    }
 
     public function invitation(): BelongsTo
     {
