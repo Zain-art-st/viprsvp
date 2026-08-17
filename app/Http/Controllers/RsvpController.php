@@ -9,20 +9,21 @@ use Illuminate\View\View;
 class RsvpController extends Controller
 {
     public function show(string $token): View
-    {
-        $contact = InvitationContact::where('token', $token)->first();
+{
+    $contact = InvitationContact::where('token', $token)->first();
 
-        if (! $contact || $this->isExpired($contact)) {
-            return view('rsvp.invalid');
-        }
-
-        $contact->update(['last_used_at' => now()]);
-
-        return view('rsvp.show', [
-            'invitation' => $contact->invitation,
-            'contact' => $contact,
-        ]);
+    if (! $contact || $this->isExpired($contact)) {
+        return view('rsvp.invalid');
     }
+
+    $contact->update(['last_used_at' => now()]);
+
+    return view('rsvp.show', [
+        'invitation' => $contact->invitation,
+        'contact' => $contact,
+        'settings' => \App\Models\FormSettings::first(),
+    ]);
+}
 
     public function submit(string $token, Request $request): \Illuminate\Http\RedirectResponse
 {
@@ -51,8 +52,8 @@ class RsvpController extends Controller
     ]);
 
     return redirect()
-        ->route('rsvp.show', $token)
-        ->with('success', 'Thank you — your response has been recorded.');
+    ->route('rsvp.show', $token)
+    ->with('success', $contact->invitation->exists ? \App\Models\FormSettings::first()->thank_you_message : 'Thank you — your response has been recorded.');
 }
 
     private function isExpired(InvitationContact $contact): bool
