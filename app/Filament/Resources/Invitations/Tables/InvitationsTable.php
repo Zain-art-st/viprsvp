@@ -8,6 +8,8 @@ use Filament\Actions\EditAction;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
+use Filament\Actions\BulkAction;
+use Illuminate\Database\Eloquent\Collection;
 
 class InvitationsTable
 {
@@ -33,12 +35,6 @@ class InvitationsTable
                 TextColumn::make('submitted_by_email')
                     ->label('Submitted By')
                     ->searchable(),
-                TextColumn::make('submitted_at')
-                    ->dateTime()
-                    ->sortable(),
-                TextColumn::make('expires_at')
-                    ->dateTime()
-                    ->sortable(),
                 TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable()
@@ -60,9 +56,34 @@ class InvitationsTable
                 EditAction::make(),
             ])
             ->toolbarActions([
-                BulkActionGroup::make([
-                    DeleteBulkAction::make(),
-                ]),
+    BulkActionGroup::make([
+        BulkAction::make('sendBulkInvitations')
+            ->label('Send Invitations')
+            ->icon('heroicon-o-envelope')
+            ->requiresConfirmation()
+            ->modalDescription('This will send an invitation email to every contact on each selected invitation. This may take a moment for large selections.')
+            ->action(function (Collection $records) {
+                $sent = 0;
+                $failed = 0;
+
+                foreach ($records as $invitation) {
+                    foreach ($invitation->contacts as $contact) {
+                        try {
+                            \Illuminate\Support\Facades\Mail::send(new \App\Mail\InvitationEmail($contact));
+                            $sent++;
+                        } catch (\Throwable $e) {
+                            $failed++;
+                        }
+                    }
+                }
+
+                \Filament\Notifications\Notification::make()
+                    ->title("Bulk send complete: {$sent} sent, {$failed} failed")
+                    ->success()
+                    ->send();
+            }),
+        DeleteBulkAction::make(),
+    ]),
             ]);
     }
 }

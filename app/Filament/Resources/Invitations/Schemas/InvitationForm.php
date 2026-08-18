@@ -6,6 +6,9 @@ use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Schema;
+use App\Models\CustomFieldDefinition;
+use Filament\Forms\Components\Repeater;
+
 
 class InvitationForm
 {
@@ -30,8 +33,8 @@ class InvitationForm
                     ->required()
                     ->default('pending'),
                 TextInput::make('vehicle_registration'),
-                TextInput::make('Pegawai terlibat'),
-                TextInput::make('Jawatan pegawai terlibat'),
+                TextInput::make('estimated_arrival')->label('Pegawai terlibat'),
+                TextInput::make('estimated_depature')->label('Jawatan Pegawai'),
                 TextInput::make('submitted_by_name')
                     ->disabled(),
                 TextInput::make('submitted_by_email')
@@ -45,11 +48,10 @@ class InvitationForm
                     ->relationship()
                     ->schema([
                         \Filament\Forms\Components\Select::make('field_key')
-                    ->label('Question')
+                    ->label('Selection')
                     ->options(fn () => CustomFieldDefinition::where('enabled', true)->pluck('label', 'field_key'))
                     ->required(),
-                TextInput::make('value')
-                    ->label('Answer'),
+                TextInput::make('value'),
             ])
                     ->columns(2)
                     ->addActionLabel('Add Detail')

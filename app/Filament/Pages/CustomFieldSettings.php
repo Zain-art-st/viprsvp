@@ -55,7 +55,8 @@ class CustomFieldSettings extends Page
     }
 
     public function save(): void
-    {
+    {   
+        logger('Save method called');
         $state = $this->form->getState();
         $submittedFields = $state['fields'] ?? [];
 
@@ -74,7 +75,7 @@ class CustomFieldSettings extends Page
             );
         }
 
-        // Remove definitions for fields that were deleted from the repeater
+     
         CustomFieldDefinition::whereNotIn('field_key', $existingKeys)->delete();
 
         Notification::make()

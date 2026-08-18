@@ -2,10 +2,13 @@
 
 namespace App\Filament\Pages;
 
+use App\Models\CustomFieldDefinition;
 use App\Models\Invitation;
 use App\Models\InvitationContact;
 use Filament\Actions\Action;
 use Filament\Forms\Components\FileUpload;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\Wizard;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Schemas\Schema;
@@ -17,108 +20,181 @@ class ImportInvitations extends Page
 
     public ?array $data = [];
 
+    public array $csvHeaders = [];
+
+    public array $csvRows = [];
+
     public function mount(): void
     {
         $this->form->fill();
+    }
+
+    private function targetFieldOptions(): array
+    {
+        $fixed = [
+            'vip_name' => 'VIP Name',
+            'organization' => 'Organization',
+            'vip_email' => 'VIP Email',
+            'vip_phone' => 'VIP Phone',
+            'pa_name' => 'Contact (PA) Name',
+            'pa_email' => 'Contact (PA) Email',
+        ];
+
+        $custom = CustomFieldDefinition::where('enabled', true)
+            ->pluck('label', 'field_key')
+            ->mapWithKeys(fn ($label, $key) => ["custom:{$key}" => "Custom: {$label}"])
+            ->toArray();
+
+        return ['' => '— Skip this column —'] + $fixed + $custom;
     }
 
     public function form(Schema $schema): Schema
     {
         return $schema
             ->components([
-                FileUpload::make('csv_file')
-                    ->label('CSV File')
-                    ->acceptedFileTypes(['text/csv', 'text/plain'])
-                    ->required()
-                    ->disk('local')
-                    ->directory('csv-imports'),
+                Wizard::make([
+                    Wizard\Step::make('Upload')
+                        ->schema([
+                            FileUpload::make('csv_file')
+                                ->label('CSV File')
+                                ->acceptedFileTypes(['text/csv', 'text/plain'])
+                                ->required()
+                                ->disk('local')
+                                ->directory('csv-imports')
+                                ->live()
+                                ->afterStateUpdated(function ($state) {
+                                    $this->loadCsvHeaders($state);
+                                }),
+                        ]),
+                    Wizard\Step::make('Map Columns')
+                        ->schema(function () {
+                            if (empty($this->csvHeaders)) {
+                                return [
+                                    \Filament\Forms\Components\Placeholder::make('none')
+                                        ->label('')
+                                        ->content('Upload a CSV on the previous step first.'),
+                                ];
+                            }
+
+                            return collect($this->csvHeaders)->map(
+                                fn ($header) => Select::make("mapping.{$header}")
+                                    ->label("Column: \"{$header}\"")
+                                    ->options($this->targetFieldOptions())
+                                    ->default('')
+                            )->toArray();
+                        }),
+                ])->submitAction(
+                    Action::make('import')
+                        ->label('Import')
+                        ->action('import')
+                ),
             ])
             ->statePath('data');
+    }
+
+    private function loadCsvHeaders(?string $path): void
+    {
+        if (! $path) {
+            $this->csvHeaders = [];
+            return;
+        }
+
+        $fullPath = Storage::disk('local')->path($path);
+
+        if (! file_exists($fullPath)) {
+            $this->csvHeaders = [];
+            return;
+        }
+
+        $rows = array_map('str_getcsv', file($fullPath));
+        $this->csvHeaders = array_map('trim', array_shift($rows));
+        $this->csvRows = $rows;
     }
 
     public function import(): void
     {
         $state = $this->form->getState();
-        $path = $state['csv_file'];
+        $mapping = $state['mapping'] ?? [];
 
-        $fullPath = Storage::disk('local')->path($path);
-        $rows = array_map('str_getcsv', file($fullPath));
-        $header = array_map('trim', array_shift($rows));
+        if (empty($this->csvHeaders) || empty($this->csvRows)) {
+            Notification::make()->title('No CSV data to import')->danger()->send();
+            return;
+        }
 
         $created = 0;
         $skipped = 0;
 
-        foreach ($rows as $row) {
-            if (count($row) !== count($header)) {
+        foreach ($this->csvRows as $row) {
+            if (count($row) !== count($this->csvHeaders)) {
                 $skipped++;
                 continue;
             }
 
-            $record = array_combine($header, $row);
+            $record = array_combine($this->csvHeaders, $row);
 
-            $vipName = trim($record['vip_name'] ?? '');
-            $paName = trim($record['pa_name'] ?? '');
-            $paEmail = trim($record['pa_email'] ?? '');
+            $get = fn (string $target) => collect($mapping)
+                ->filter(fn ($t) => $t === $target)
+                ->keys()
+                ->map(fn ($header) => trim($record[$header] ?? ''))
+                ->first(fn ($v) => $v !== '');
 
-            if (! $vipName ) {
+            $vipName = $get('vip_name');
+            $paEmail = $get('pa_email');
+            $paName = $get('pa_name');
+
+            if (! $vipName) {
                 $skipped++;
                 continue;
             }
 
             $invitation = Invitation::firstOrCreate(
-    [
-        'vip_name' => $vipName,
-        'organization' => trim($record['organization'] ?? '') ?: null,
-    ],
-    [
-        'vip_email' => trim($record['vip_email'] ?? '') ?: null,
-        'vip_phone' => trim($record['vip_phone'] ?? '') ?: null,
-    ],
-);
-if ($paEmail) {
-    InvitationContact::firstOrCreate(
-        [
-            'invitation_id' => $invitation->id,
-            'email' => $paEmail,
-        ],
-        [
-            'name' => $paName ?: $paEmail,
-            'token' => \Illuminate\Support\Str::random(40),
-        ],
-    );
-}
+                [
+                    'vip_name' => $vipName,
+                    'organization' => $get('organization') ?: null,
+                ],
+                [
+                    'vip_email' => $get('vip_email') ?: null,
+                    'vip_phone' => $get('vip_phone') ?: null,
+                ],
+            );
 
-InvitationContact::firstOrCreate(
-    [
-        'invitation_id' => $invitation->id,
-        'email' => $paEmail,
-    ],
-    [
-        'name' => $paName ?: $paEmail,
-        'token' => \Illuminate\Support\Str::random(40),
-    ],
-);
+            if ($paEmail) {
+                InvitationContact::firstOrCreate(
+                    [
+                        'invitation_id' => $invitation->id,
+                        'email' => $paEmail,
+                    ],
+                    [
+                        'name' => $paName ?: $paEmail,
+                        'token' => \Illuminate\Support\Str::random(40),
+                    ],
+                );
+            }
 
-$created++;
-            
-        }
+            foreach ($mapping as $header => $target) {
+                if (str_starts_with((string) $target, 'custom:')) {
+                    $fieldKey = substr($target, 7);
+                    $value = trim($record[$header] ?? '');
 
-        Storage::disk('local')->delete($path);
+                    if ($value !== '') {
+                        \App\Models\CustomFieldValue::updateOrCreate(
+                            ['invitation_id' => $invitation->id, 'field_key' => $fieldKey],
+                            ['value' => $value],
+                        );
+                    }
+                }
+            }
+
+            $created++;
+     }
 
         Notification::make()
-            ->title("Import complete: {$created} contacts processed, {$skipped} rows skipped")
+            ->title("Import complete: {$created} rows processed, {$skipped} skipped")
             ->success()
             ->send();
 
+        $this->csvHeaders = [];
+        $this->csvRows = [];
         $this->form->fill();
-    }
-
-    protected function getFormActions(): array
-    {
-        return [
-            Action::make('import')
-                ->label('Import')
-                ->action('import'),
-        ];
-    }
+   }
 }
