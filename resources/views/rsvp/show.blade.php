@@ -56,16 +56,16 @@
 
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">{{ $settings->arrival_label }}</label>
-                <input type="text" name="estimated_arrival"
-                    value="{{ old('estimated_arrival', $invitation->estimated_arrival) }}"
+                <input type="text" name="Pegawai terlibat"
+                    value="{{ old('Nama Pegawai', $invitation->Nama_Pegawai) }}"
                     placeholder="e.g. 9:00 AM"
                     class="w-full border border-gray-300 rounded px-3 py-2">
             </div>
 
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">{{ $settings->departure_label }}</label>
-                <input type="text" name="estimated_departure"
-                    value="{{ old('estimated_departure', $invitation->estimated_departure) }}"
+                <input type="text" name="Jawatan Pegawai"
+                    value="{{ old('Jawatan Pegawai Pengiring', $invitation->Jawatan Pegawai Pengiring) }}"
                     placeholder="e.g. 1:00 PM"
                     class="w-full border border-gray-300 rounded px-3 py-2">
             </div>

@@ -14,8 +14,8 @@ class Invitation extends Model
     'vip_phone',
     'attendance_status',
     'vehicle_registration',
-    'estimated_arrival',
-    'estimated_departure',
+    'Pegawai terlibat',
+    'Jawatan pegawai',
     'submitted_by_name',
     'submitted_by_email',
     'submitted_at',
@@ -31,4 +31,9 @@ class Invitation extends Model
     {
         return $this->hasMany(InvitationContact::class);
     }
+
+    public function customFieldValues(): \Illuminate\Database\Eloquent\Relations\HasMany
+{
+    return $this->hasMany(CustomFieldValue::class);
+}
 }

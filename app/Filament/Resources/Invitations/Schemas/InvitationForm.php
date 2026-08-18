@@ -30,8 +30,8 @@ class InvitationForm
                     ->required()
                     ->default('pending'),
                 TextInput::make('vehicle_registration'),
-                TextInput::make('estimated_arrival'),
-                TextInput::make('estimated_departure'),
+                TextInput::make('Pegawai terlibat'),
+                TextInput::make('Jawatan pegawai terlibat'),
                 TextInput::make('submitted_by_name')
                     ->disabled(),
                 TextInput::make('submitted_by_email')
