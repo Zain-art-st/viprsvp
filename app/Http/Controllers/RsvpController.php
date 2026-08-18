@@ -18,14 +18,23 @@ class RsvpController extends Controller
 
     $contact->update(['last_used_at' => now()]);
 
+    $customFields = \App\Models\CustomFieldDefinition::where('enabled', true)
+        ->orderBy('sort_order')
+        ->get();
+
+    $existingValues = $contact->invitation->customFieldValues()
+        ->pluck('value', 'field_key');
+
     return view('rsvp.show', [
         'invitation' => $contact->invitation,
         'contact' => $contact,
         'settings' => \App\Models\FormSettings::first(),
+        'customFields' => $customFields,
+        'existingValues' => $existingValues,
     ]);
 }
 
-    public function submit(string $token, Request $request): \Illuminate\Http\RedirectResponse
+   public function submit(string $token, Request $request): \Illuminate\Http\RedirectResponse
 {
     $contact = InvitationContact::where('token', $token)->first();
 
@@ -39,6 +48,8 @@ class RsvpController extends Controller
         'estimated_arrival' => ['nullable', 'string', 'max:255'],
         'estimated_departure' => ['nullable', 'string', 'max:255'],
         'submitted_by_name' => ['nullable', 'string', 'max:255'],
+        'custom_fields' => ['nullable', 'array'],
+        'custom_fields.*' => ['nullable', 'string', 'max:255'],
     ]);
 
     $contact->invitation->update([
@@ -51,9 +62,19 @@ class RsvpController extends Controller
         'submitted_at' => now(),
     ]);
 
+    foreach ($validated['custom_fields'] ?? [] as $fieldKey => $value) {
+        \App\Models\CustomFieldValue::updateOrCreate(
+            [
+                'invitation_id' => $contact->invitation->id,
+                'field_key' => $fieldKey,
+            ],
+            ['value' => $value],
+        );
+    }
+
     return redirect()
-    ->route('rsvp.show', $token)
-    ->with('success', $contact->invitation->exists ? \App\Models\FormSettings::first()->thank_you_message : 'Thank you — your response has been recorded.');
+        ->route('rsvp.show', $token)
+        ->with('success', \App\Models\FormSettings::first()->thank_you_message ?? 'Thank you — your response has been recorded.');
 }
 
     private function isExpired(InvitationContact $contact): bool

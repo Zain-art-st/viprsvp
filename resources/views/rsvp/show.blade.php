@@ -77,6 +77,18 @@
                     class="w-full border border-gray-300 rounded px-3 py-2">
                 <p class="text-xs text-gray-500 mt-1">Confirming as {{ $contact->email }}</p>
             </div>
+            @if ($customFields->isNotEmpty())
+    <div class="space-y-5 border-t border-gray-200 pt-5">
+        @foreach ($customFields as $field)
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">{{ $field->label }}</label>
+                <input type="text" name="custom_fields[{{ $field->field_key }}]"
+                    value="{{ old('custom_fields.'.$field->field_key, $existingValues[$field->field_key] ?? '') }}"
+                    class="w-full border border-gray-300 rounded px-3 py-2">
+            </div>
+        @endforeach
+    </div>
+@endif
 
             <button type="submit" class="w-full bg-gray-900 text-white rounded py-2.5 font-medium">
                 {{ $settings->submit_button_label }}

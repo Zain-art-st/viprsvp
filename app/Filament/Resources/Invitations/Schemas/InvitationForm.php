@@ -40,6 +40,20 @@ class InvitationForm
                 DateTimePicker::make('submitted_at')
                     ->disabled(),
                 DateTimePicker::make('expires_at'),
+                Repeater::make('customFieldValues')
+                    ->label('Additional Details')
+                    ->relationship()
+                    ->schema([
+                        \Filament\Forms\Components\Select::make('field_key')
+                    ->label('Question')
+                    ->options(fn () => CustomFieldDefinition::where('enabled', true)->pluck('label', 'field_key'))
+                    ->required(),
+                TextInput::make('value')
+                    ->label('Answer'),
+            ])
+                    ->columns(2)
+                    ->addActionLabel('Add Detail')
+                    ->defaultItems(0),
             ]);
     }
 }
