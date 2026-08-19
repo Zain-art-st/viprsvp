@@ -23,8 +23,6 @@ class ImportInvitations extends Page
     protected string $view = 'filament.pages.import-invitations';
 
     public ?array $data = [];
-
-    // Bringing back headers so Step 2 renders reliably, but keeping Rows deleted for memory safety!
     public array $csvHeaders = [];
 
     public function mount(): void
@@ -66,7 +64,6 @@ class ImportInvitations extends Page
                                 ->directory('csv-imports')
                                 ->live()
                                 ->afterStateUpdated(function ($state) {
-                                    // Dynamically extract and sanitize headers immediately after upload
                                     if (! $state) {
                                         $this->csvHeaders = [];
                                         return;
@@ -81,7 +78,6 @@ class ImportInvitations extends Page
                                         fclose($file);
 
                                         if ($headers) {
-                                            // Strip BOM and convert spaces/dots to underscores so Livewire doesn't break
                                             $headers[0] = preg_replace('/[\x00-\x1F\x80-\xFF]/', '', $headers[0]);
                                             $this->csvHeaders = array_map(function($h) {
                                                 return str_replace([' ', '.'], '_', trim($h));
@@ -99,8 +95,6 @@ class ImportInvitations extends Page
                                         ->content('Upload a valid CSV on the previous step first.'),
                                 ];
                             }
-
-                            // Now reliably builds the dropdowns from the public property
                             return collect($this->csvHeaders)->map(
                                 fn ($header) => Select::make("mapping.{$header}")
                                     ->label("Column: \"{$header}\"")
@@ -142,7 +136,6 @@ class ImportInvitations extends Page
         $file = fopen($fullPath, 'r');
         $rawHeaders = fgetcsv($file);
 
-        // Sanitize headers exactly the same way we did in afterStateUpdated
         $rawHeaders[0] = preg_replace('/[\x00-\x1F\x80-\xFF]/', '', $rawHeaders[0]);
         $headers = array_map(function($h) {
             return str_replace([' ', '.'], '_', trim($h));
@@ -224,7 +217,7 @@ class ImportInvitations extends Page
             ->success()
             ->send();
 
-        $this->csvHeaders = []; // Clear headers after success
+        $this->csvHeaders = [];
         $this->form->fill();
     }
 }

@@ -15,7 +15,7 @@ class Invitation extends Model
     'attendance_status',
     'vehicle_registration',
     'Pegawai terlibat',
-    'Jawatan pegawai',
+    'Jawatan_pegawai',
     'submitted_by_name',
     'submitted_by_email',
     'submitted_at',

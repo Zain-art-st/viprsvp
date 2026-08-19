@@ -55,22 +55,6 @@
             </div>
 
             <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">{{ $settings->estimated_arrival }}</label>
-                <input type="text" name="estimated_arrival"
-                    value="{{ old('estimated_arrival', $invitation->estimated_arrival) }}"
-                    placeholder="e.g. 9:00 AM"
-                    class="w-full border border-gray-300 rounded px-3 py-2">
-            </div>
-
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">{{ $settings->estimated_departure }}</label>
-                <input type="text" name="estimated_departure"
-                    value="{{ old('estimated_departure', $invitation->estimated_departure) }}"
-                    placeholder="e.g. 1:00 PM"
-                    class="w-full border border-gray-300 rounded px-3 py-2">
-            </div>
-
-            <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">{{ $settings->name_label }}</label>
                 <input type="text" name="submitted_by_name"
                     value="{{ old('submitted_by_name', $contact->name) }}"
