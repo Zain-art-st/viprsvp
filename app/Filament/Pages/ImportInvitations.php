@@ -3,16 +3,20 @@
 namespace App\Filament\Pages;
 
 use App\Models\CustomFieldDefinition;
+use App\Models\CustomFieldValue;
 use App\Models\Invitation;
 use App\Models\InvitationContact;
 use Filament\Actions\Action;
 use Filament\Forms\Components\FileUpload;
+use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Select;
-use Filament\Forms\Components\Wizard;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
+use Filament\Schemas\Components\Wizard;
 use Filament\Schemas\Schema;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 class ImportInvitations extends Page
 {
@@ -20,9 +24,8 @@ class ImportInvitations extends Page
 
     public ?array $data = [];
 
+    // Bringing back headers so Step 2 renders reliably, but keeping Rows deleted for memory safety!
     public array $csvHeaders = [];
-
-    public array $csvRows = [];
 
     public function mount(): void
     {
@@ -63,19 +66,41 @@ class ImportInvitations extends Page
                                 ->directory('csv-imports')
                                 ->live()
                                 ->afterStateUpdated(function ($state) {
-                                    $this->loadCsvHeaders($state);
+                                    // Dynamically extract and sanitize headers immediately after upload
+                                    if (! $state) {
+                                        $this->csvHeaders = [];
+                                        return;
+                                    }
+
+                                    $path = is_array($state) ? array_values($state)[0] : $state;
+                                    $fullPath = Storage::disk('local')->path($path);
+
+                                    if (file_exists($fullPath)) {
+                                        $file = fopen($fullPath, 'r');
+                                        $headers = fgetcsv($file);
+                                        fclose($file);
+
+                                        if ($headers) {
+                                            // Strip BOM and convert spaces/dots to underscores so Livewire doesn't break
+                                            $headers[0] = preg_replace('/[\x00-\x1F\x80-\xFF]/', '', $headers[0]);
+                                            $this->csvHeaders = array_map(function($h) {
+                                                return str_replace([' ', '.'], '_', trim($h));
+                                            }, $headers);
+                                        }
+                                    }
                                 }),
                         ]),
                     Wizard\Step::make('Map Columns')
                         ->schema(function () {
                             if (empty($this->csvHeaders)) {
                                 return [
-                                    \Filament\Forms\Components\Placeholder::make('none')
+                                    Placeholder::make('none')
                                         ->label('')
-                                        ->content('Upload a CSV on the previous step first.'),
+                                        ->content('Upload a valid CSV on the previous step first.'),
                                 ];
                             }
 
+                            // Now reliably builds the dropdowns from the public property
                             return collect($this->csvHeaders)->map(
                                 fn ($header) => Select::make("mapping.{$header}")
                                     ->label("Column: \"{$header}\"")
@@ -92,57 +117,61 @@ class ImportInvitations extends Page
             ->statePath('data');
     }
 
-    private function loadCsvHeaders(?string $path): void
-    {
-        if (! $path) {
-            $this->csvHeaders = [];
-            return;
-        }
-
-        $fullPath = Storage::disk('local')->path($path);
-
-        if (! file_exists($fullPath)) {
-            $this->csvHeaders = [];
-            return;
-        }
-
-        $rows = array_map('str_getcsv', file($fullPath));
-        $this->csvHeaders = array_map('trim', array_shift($rows));
-        $this->csvRows = $rows;
-    }
-
     public function import(): void
     {
         $state = $this->form->getState();
         $mapping = $state['mapping'] ?? [];
+        $fileState = $state['csv_file'] ?? null;
 
-        if (empty($this->csvHeaders) || empty($this->csvRows)) {
-            Notification::make()->title('No CSV data to import')->danger()->send();
+        if (! $fileState || empty($mapping)) {
+            Notification::make()->title('Missing file or mapping data.')->danger()->send();
+            return;
+        }
+
+        $path = is_array($fileState) ? array_values($fileState)[0] : $fileState;
+        $fullPath = Storage::disk('local')->path($path);
+
+        if (! file_exists($fullPath)) {
+            Notification::make()->title('Could not find the uploaded file.')->danger()->send();
             return;
         }
 
         $created = 0;
         $skipped = 0;
 
-        foreach ($this->csvRows as $row) {
-            if (count($row) !== count($this->csvHeaders)) {
+        $file = fopen($fullPath, 'r');
+        $rawHeaders = fgetcsv($file);
+
+        // Sanitize headers exactly the same way we did in afterStateUpdated
+        $rawHeaders[0] = preg_replace('/[\x00-\x1F\x80-\xFF]/', '', $rawHeaders[0]);
+        $headers = array_map(function($h) {
+            return str_replace([' ', '.'], '_', trim($h));
+        }, $rawHeaders);
+
+        while (($row = fgetcsv($file)) !== false) {
+            if (count($row) !== count($headers)) {
+                Log::warning("Skipped row: Column count mismatch.");
                 $skipped++;
                 continue;
             }
 
-            $record = array_combine($this->csvHeaders, $row);
+            $record = array_combine($headers, $row);
 
-            $get = fn (string $target) => collect($mapping)
+            $getMappedValue = fn (string $target) => collect($mapping)
                 ->filter(fn ($t) => $t === $target)
                 ->keys()
                 ->map(fn ($header) => trim($record[$header] ?? ''))
                 ->first(fn ($v) => $v !== '');
 
-            $vipName = $get('vip_name');
-            $paEmail = $get('pa_email');
-            $paName = $get('pa_name');
+            $vipName = $getMappedValue('vip_name');
+            $paEmail = $getMappedValue('pa_email');
+            $paName = $getMappedValue('pa_name');
 
             if (! $vipName) {
+                Log::warning("Skipped row: Missing VIP Name after mapping.", [
+                    'record_data' => $record,
+                    'mapping_state' => $mapping
+                ]);
                 $skipped++;
                 continue;
             }
@@ -150,11 +179,11 @@ class ImportInvitations extends Page
             $invitation = Invitation::firstOrCreate(
                 [
                     'vip_name' => $vipName,
-                    'organization' => $get('organization') ?: null,
+                    'organization' => $getMappedValue('organization') ?: null,
                 ],
                 [
-                    'vip_email' => $get('vip_email') ?: null,
-                    'vip_phone' => $get('vip_phone') ?: null,
+                    'vip_email' => $getMappedValue('vip_email') ?: null,
+                    'vip_phone' => $getMappedValue('vip_phone') ?: null,
                 ],
             );
 
@@ -166,7 +195,7 @@ class ImportInvitations extends Page
                     ],
                     [
                         'name' => $paName ?: $paEmail,
-                        'token' => \Illuminate\Support\Str::random(40),
+                        'token' => Str::random(40),
                     ],
                 );
             }
@@ -177,7 +206,7 @@ class ImportInvitations extends Page
                     $value = trim($record[$header] ?? '');
 
                     if ($value !== '') {
-                        \App\Models\CustomFieldValue::updateOrCreate(
+                        CustomFieldValue::updateOrCreate(
                             ['invitation_id' => $invitation->id, 'field_key' => $fieldKey],
                             ['value' => $value],
                         );
@@ -186,15 +215,16 @@ class ImportInvitations extends Page
             }
 
             $created++;
-     }
+        }
+
+        fclose($file);
 
         Notification::make()
             ->title("Import complete: {$created} rows processed, {$skipped} skipped")
             ->success()
             ->send();
 
-        $this->csvHeaders = [];
-        $this->csvRows = [];
+        $this->csvHeaders = []; // Clear headers after success
         $this->form->fill();
-   }
+    }
 }

@@ -35,7 +35,7 @@ class EmailTemplateSettings extends Page
             ->components([
                 Placeholder::make('help')
                     ->label('')
-                    ->content('You can use these placeholders anywhere in the subject or body — they will be automatically replaced for each recipient: {vip_name}, {contact_name}, {rsvp_link}'),
+                    ->content('You can use these placeholders anywhere in the subject or body they will be automatically replaced for each recipient: {vip_name}, {contact_name}, {rsvp_link}'),
 
                 TextInput::make('subject')
                     ->required()
@@ -47,7 +47,7 @@ class EmailTemplateSettings extends Page
                     ->disk('public')
                     ->directory('email-banners')
                     ->imageEditor()
-                    ->helperText('Recommended width: 600px. This appears at the top of the invitation email.'),
+                    ->helperText('Recommended width: 600px.'),
 
                 RichEditor::make('body')
                     ->required()
