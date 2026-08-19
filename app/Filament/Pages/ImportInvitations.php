@@ -31,24 +31,29 @@ class ImportInvitations extends Page
     }
 
     private function targetFieldOptions(): array
-    {
-        $fixed = [
-            'vip_name' => 'VIP Name',
-            'organization' => 'Organization',
-            'vip_email' => 'VIP Email',
-            'vip_phone' => 'VIP Phone',
-            'pa_name' => 'Contact (PA) Name',
-            'pa_email' => 'Contact (PA) Email',
-        ];
+{
+    $fixed = [
+        'vip_name' => 'VIP Name',
+        'organization' => 'Organization',
+        'vip_email' => 'VIP Email',
+        'vip_phone' => 'VIP Phone',
+        'pa_name' => 'Contact (PA) Name',
+        'pa_email' => 'Contact (PA) Email',
+    ];
 
-        $custom = CustomFieldDefinition::where('enabled', true)
-            ->pluck('label', 'field_key')
-            ->mapWithKeys(fn ($label, $key) => ["custom:{$key}" => "Custom: {$label}"])
-            ->toArray();
+    $custom = CustomFieldDefinition::where('enabled', true)
+        ->pluck('label', 'field_key')
+        ->mapWithKeys(fn ($label, $key) => ["custom:{$key}" => "Custom: {$label}"])
+        ->toArray();
 
-        return ['' => '— Skip this column —'] + $fixed + $custom;
+    $options = ['' => '— Skip this column —'] + $fixed + $custom;
+
+    if (CustomFieldDefinition::count() < 5) {
+        $options['new_custom'] = '+ Create new custom field from this column';
     }
 
+    return $options;
+}
     public function form(Schema $schema): Schema
     {
         return $schema
@@ -112,112 +117,142 @@ class ImportInvitations extends Page
     }
 
     public function import(): void
-    {
-        $state = $this->form->getState();
-        $mapping = $state['mapping'] ?? [];
-        $fileState = $state['csv_file'] ?? null;
+{
+    $state = $this->form->getState();
+    $mapping = $state['mapping'] ?? [];
+    $fileState = $state['csv_file'] ?? null;
 
-        if (! $fileState || empty($mapping)) {
-            Notification::make()->title('Missing file or mapping data.')->danger()->send();
-            return;
+    if (! $fileState || empty($mapping)) {
+        Notification::make()->title('Missing file or mapping data.')->danger()->send();
+        return;
+    }
+
+    $path = is_array($fileState) ? array_values($fileState)[0] : $fileState;
+    $fullPath = Storage::disk('local')->path($path);
+
+    if (! file_exists($fullPath)) {
+        Notification::make()->title('Could not find the uploaded file.')->danger()->send();
+        return;
+    }
+
+    // Resolve any "create new custom field" choices into real definitions first
+    $slotsAvailable = 5 - CustomFieldDefinition::count();
+    $skippedNewFields = [];
+
+    foreach ($mapping as $header => $target) {
+        if ($target !== 'new_custom') {
+            continue;
         }
 
-        $path = is_array($fileState) ? array_values($fileState)[0] : $fileState;
-        $fullPath = Storage::disk('local')->path($path);
-
-        if (! file_exists($fullPath)) {
-            Notification::make()->title('Could not find the uploaded file.')->danger()->send();
-            return;
+        if ($slotsAvailable <= 0) {
+            $mapping[$header] = '';
+            $skippedNewFields[] = $header;
+            continue;
         }
 
-        $created = 0;
-        $skipped = 0;
+        $definition = CustomFieldDefinition::create([
+            'field_key' => 'custom_'.Str::random(8),
+            'label' => $header,
+            'enabled' => true,
+            'sort_order' => CustomFieldDefinition::max('sort_order') + 1,
+        ]);
 
-        $file = fopen($fullPath, 'r');
-        $rawHeaders = fgetcsv($file);
+        $mapping[$header] = 'custom:'.$definition->field_key;
+        $slotsAvailable--;
+    }
 
-        $rawHeaders[0] = preg_replace('/[\x00-\x1F\x80-\xFF]/', '', $rawHeaders[0]);
-        $headers = array_map(function($h) {
-            return str_replace([' ', '.'], '_', trim($h));
-        }, $rawHeaders);
+    $created = 0;
+    $skipped = 0;
 
-        while (($row = fgetcsv($file)) !== false) {
-            if (count($row) !== count($headers)) {
-                Log::warning("Skipped row: Column count mismatch.");
-                $skipped++;
-                continue;
-            }
+    $file = fopen($fullPath, 'r');
+    $rawHeaders = fgetcsv($file);
 
-            $record = array_combine($headers, $row);
+    $rawHeaders[0] = preg_replace('/[\x00-\x1F\x80-\xFF]/', '', $rawHeaders[0]);
+    $headers = array_map(function($h) {
+        return str_replace([' ', '.'], '_', trim($h));
+    }, $rawHeaders);
 
-            $getMappedValue = fn (string $target) => collect($mapping)
-                ->filter(fn ($t) => $t === $target)
-                ->keys()
-                ->map(fn ($header) => trim($record[$header] ?? ''))
-                ->first(fn ($v) => $v !== '');
+    while (($row = fgetcsv($file)) !== false) {
+        if (count($row) !== count($headers)) {
+            Log::warning("Skipped row: Column count mismatch.");
+            $skipped++;
+            continue;
+        }
 
-            $vipName = $getMappedValue('vip_name');
-            $paEmail = $getMappedValue('pa_email');
-            $paName = $getMappedValue('pa_name');
+        $record = array_combine($headers, $row);
 
-            if (! $vipName) {
-                Log::warning("Skipped row: Missing VIP Name after mapping.", [
-                    'record_data' => $record,
-                    'mapping_state' => $mapping
-                ]);
-                $skipped++;
-                continue;
-            }
+        $getMappedValue = fn (string $target) => collect($mapping)
+            ->filter(fn ($t) => $t === $target)
+            ->keys()
+            ->map(fn ($header) => trim($record[$header] ?? ''))
+            ->first(fn ($v) => $v !== '');
 
-            $invitation = Invitation::firstOrCreate(
+        $vipName = $getMappedValue('vip_name');
+        $paEmail = $getMappedValue('pa_email');
+        $paName = $getMappedValue('pa_name');
+
+        if (! $vipName) {
+            Log::warning("Skipped row: Missing VIP Name after mapping.", [
+                'record_data' => $record,
+                'mapping_state' => $mapping
+            ]);
+            $skipped++;
+            continue;
+        }
+
+        $invitation = Invitation::firstOrCreate(
+            [
+                'vip_name' => $vipName,
+                'organization' => $getMappedValue('organization') ?: null,
+            ],
+            [
+                'vip_email' => $getMappedValue('vip_email') ?: null,
+                'vip_phone' => $getMappedValue('vip_phone') ?: null,
+            ],
+        );
+
+        if ($paEmail) {
+            InvitationContact::firstOrCreate(
                 [
-                    'vip_name' => $vipName,
-                    'organization' => $getMappedValue('organization') ?: null,
+                    'invitation_id' => $invitation->id,
+                    'email' => $paEmail,
                 ],
                 [
-                    'vip_email' => $getMappedValue('vip_email') ?: null,
-                    'vip_phone' => $getMappedValue('vip_phone') ?: null,
+                    'name' => $paName ?: $paEmail,
+                    'token' => Str::random(40),
                 ],
             );
-
-            if ($paEmail) {
-                InvitationContact::firstOrCreate(
-                    [
-                        'invitation_id' => $invitation->id,
-                        'email' => $paEmail,
-                    ],
-                    [
-                        'name' => $paName ?: $paEmail,
-                        'token' => Str::random(40),
-                    ],
-                );
-            }
-
-            foreach ($mapping as $header => $target) {
-                if (str_starts_with((string) $target, 'custom:')) {
-                    $fieldKey = substr($target, 7);
-                    $value = trim($record[$header] ?? '');
-
-                    if ($value !== '') {
-                        CustomFieldValue::updateOrCreate(
-                            ['invitation_id' => $invitation->id, 'field_key' => $fieldKey],
-                            ['value' => $value],
-                        );
-                    }
-                }
-            }
-
-            $created++;
         }
 
-        fclose($file);
+        foreach ($mapping as $header => $target) {
+            if (str_starts_with((string) $target, 'custom:')) {
+                $fieldKey = substr($target, 7);
+                $value = trim($record[$header] ?? '');
 
-        Notification::make()
-            ->title("Import complete: {$created} rows processed, {$skipped} skipped")
-            ->success()
-            ->send();
+                if ($value !== '') {
+                    CustomFieldValue::updateOrCreate(
+                        ['invitation_id' => $invitation->id, 'field_key' => $fieldKey],
+                        ['value' => $value],
+                    );
+                }
+            }
+        }
 
-        $this->csvHeaders = [];
-        $this->form->fill();
+        $created++;
     }
-}
+
+    fclose($file);
+
+    $message = "Import complete: {$created} rows processed, {$skipped} skipped";
+    if (! empty($skippedNewFields)) {
+        $message .= '. Could not create new field(s) for: '.implode(', ', $skippedNewFields).' (5-field limit reached)';
+    }
+
+    Notification::make()
+        ->title($message)
+        ->success()
+        ->send();
+
+    $this->csvHeaders = [];
+    $this->form->fill();
+}}

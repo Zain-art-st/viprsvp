@@ -54,6 +54,24 @@
                     class="w-full border border-gray-300 rounded px-3 py-2">
             </div>
 
+            <!-- New Estimated Arrival Field -->
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Estimated Arrival</label>
+                <input type="text" name="estimated_arrival"
+                    value="{{ old('estimated_arrival', $invitation->estimated_arrival ?? '') }}"
+                    placeholder="09:00 AM"
+                    class="w-full border border-gray-300 rounded px-3 py-2">
+            </div>
+
+            <!-- New Estimated Departure Field -->
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Estimated Departure</label>
+                <input type="text" name="estimated_departure"
+                    value="{{ old('estimated_departure', $invitation->estimated_departure ?? '') }}"
+                    placeholder="03:00 PM"
+                    class="w-full border border-gray-300 rounded px-3 py-2">
+            </div>
+
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">{{ $settings->name_label }}</label>
                 <input type="text" name="submitted_by_name"
@@ -63,17 +81,17 @@
             </div>
 
             @if ($customFields->isNotEmpty())
-    <div class="space-y-5 border-t border-gray-200 pt-5">
-        @foreach ($customFields as $field)
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">{{ $field->label }}</label>
-                <input type="text" name="custom_fields[{{ $field->field_key }}]"
-                    value="{{ old('custom_fields.'.$field->field_key, $existingValues[$field->field_key] ?? '') }}"
-                    class="w-full border border-gray-300 rounded px-3 py-2">
+            <div class="space-y-5 border-t border-gray-200 pt-5">
+                @foreach ($customFields as $field)
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">{{ $field->label }}</label>
+                        <input type="text" name="custom_fields[{{ $field->field_key }}]"
+                            value="{{ old('custom_fields.'.$field->field_key, $existingValues[$field->field_key] ?? '') }}"
+                            class="w-full border border-gray-300 rounded px-3 py-2">
+                    </div>
+                @endforeach
             </div>
-        @endforeach
-    </div>
-@endif
+            @endif
 
             <button type="submit" class="w-full bg-gray-900 text-white rounded py-2.5 font-medium">
                 {{ $settings->submit_button_label }}
