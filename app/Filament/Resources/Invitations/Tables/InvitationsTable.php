@@ -26,12 +26,18 @@ class InvitationsTable
                      ->label('VIP Email')
                     ->searchable(),
                 TextColumn::make('attendance_status')
-                    ->badge()
-                    ->colors([
-                        'warning' => 'pending',
-                        'success' => 'attending',
-                        'danger' => 'not_attending',
-                    ]),
+    ->badge()
+    ->colors([
+        'warning' => 'pending',
+        'success' => 'attending',
+        'info' => 'representative_attending',
+        'danger' => 'not_attending',
+    ]),
+
+TextColumn::make('representative_name')
+    ->label('Representative')
+    ->placeholder('—')
+    ->toggleable(isToggledHiddenByDefault: true),   
                 TextColumn::make('submitted_by_email')
                     ->label('Submitted By')
                     ->searchable(),
@@ -46,11 +52,12 @@ class InvitationsTable
             ])
             ->filters([
                 SelectFilter::make('attendance_status')
-                    ->options([
-                        'pending' => 'Pending',
-                        'attending' => 'Attending',
-                        'not_attending' => 'Not Attending',
-                    ]),
+    ->options([
+        'pending' => 'Pending',
+        'attending' => 'Attending',
+        'representative_attending' => 'Representative Attending',
+        'not_attending' => 'Not Attending',
+    ]),
             ])
             ->recordActions([
                 EditAction::make(),

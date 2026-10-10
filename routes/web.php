@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\Auth\GoogleAuthController;
 
 Route::get('/', function () {
     return view('welcome');
@@ -14,3 +15,5 @@ Route::get('/rsvp/{token}', [RsvpController::class, 'show'])
 Route::post('/rsvp/{token}', [RsvpController::class, 'submit'])
     ->middleware('throttle:10,1')
     ->name('rsvp.submit');
+Route::get('/auth/google/redirect', [GoogleAuthController::class, 'redirect'])->name('auth.google.redirect');
+Route::get('/auth/google/callback', [GoogleAuthController::class, 'callback'])->name('auth.google.callback');

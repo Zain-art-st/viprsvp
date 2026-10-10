@@ -13,19 +13,23 @@ class Invitation extends Model
     'vip_email',
     'vip_phone',
     'attendance_status',
+    'representative_name',
+    'representative_role',
     'vehicle_registration',
-    'Pegawai terlibat',
-    'Jawatan_pegawai',
+    'estimated_arrival',
+    'estimated_departure',
     'submitted_by_name',
     'submitted_by_email',
     'submitted_at',
+    'is_locked',
     'expires_at',
 ];
 
     protected $casts = [
-        'submitted_at' => 'datetime',
-        'expires_at' => 'datetime',
-    ];
+    'submitted_at' => 'datetime',
+    'expires_at' => 'datetime',
+    'is_locked' => 'boolean',
+];
 
     public function contacts(): HasMany
     {

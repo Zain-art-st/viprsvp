@@ -25,13 +25,20 @@ class InvitationForm
                 TextInput::make('vip_phone')
                     ->label('VIP Phone'),
                 Select::make('attendance_status')
-                    ->options([
-                        'pending' => 'Pending',
-                        'attending' => 'Attending',
-                        'not_attending' => 'Not Attending',
-                    ])
-                    ->required()
-                    ->default('pending'),
+    ->options([
+        'pending' => 'Pending',
+        'attending' => 'Attending',
+        'representative_attending' => 'Representative Attending',
+        'not_attending' => 'Not Attending',
+    ])
+    ->required()
+    ->default('pending'),
+
+TextInput::make('representative_name')
+    ->label('Representative Name'),
+
+TextInput::make('representative_role')
+    ->label('Representative Role/Title'),
                 TextInput::make('vehicle_registration'),
                 TextInput::make('estimated_arrival')->label('Waktu Tiba'),
                 TextInput::make('estimated_depature')->label('Waktu pulang'),

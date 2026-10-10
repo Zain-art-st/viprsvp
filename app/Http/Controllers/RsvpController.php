@@ -34,7 +34,7 @@ class RsvpController extends Controller
     ]);
 }
 
-   public function submit(string $token, Request $request): \Illuminate\Http\RedirectResponse
+public function submit(string $token, Request $request): \Illuminate\Http\RedirectResponse
 {
     $contact = InvitationContact::where('token', $token)->first();
 
@@ -42,8 +42,16 @@ class RsvpController extends Controller
         abort(404);
     }
 
+    if ($contact->invitation->is_locked) {
+        return redirect()
+            ->route('rsvp.show', $token)
+            ->with('error', 'This response has already been recorded and cannot be changed.');
+    }
+
     $validated = $request->validate([
-        'attendance_status' => ['required', 'in:attending,not_attending'],
+        'attendance_status' => ['required', 'in:attending,representative_attending,not_attending'],
+        'representative_name' => ['required_if:attendance_status,representative_attending', 'nullable', 'string', 'max:255'],
+        'representative_role' => ['nullable', 'string', 'max:255'],
         'vehicle_registration' => ['nullable', 'string', 'max:255'],
         'estimated_arrival' => ['nullable', 'string', 'max:255'],
         'estimated_departure' => ['nullable', 'string', 'max:255'],
@@ -54,20 +62,20 @@ class RsvpController extends Controller
 
     $contact->invitation->update([
         'attendance_status' => $validated['attendance_status'],
+        'representative_name' => $validated['representative_name'] ?? null,
+        'representative_role' => $validated['representative_role'] ?? null,
         'vehicle_registration' => $validated['vehicle_registration'],
         'estimated_arrival' => $validated['estimated_arrival'],
         'estimated_departure' => $validated['estimated_departure'],
         'submitted_by_name' => $validated['submitted_by_name'] ?: $contact->name,
         'submitted_by_email' => $contact->email,
         'submitted_at' => now(),
+        'is_locked' => true,
     ]);
 
     foreach ($validated['custom_fields'] ?? [] as $fieldKey => $value) {
         \App\Models\CustomFieldValue::updateOrCreate(
-            [
-                'invitation_id' => $contact->invitation->id,
-                'field_key' => $fieldKey,
-            ],
+            ['invitation_id' => $contact->invitation->id, 'field_key' => $fieldKey],
             ['value' => $value],
         );
     }
